@@ -1,0 +1,8 @@
+1.3.8 (Fr_UNIFIED.c file version v1.0.90.0)
+    - Fr_UNIFIED.c - Code cleaning done, FR_REG_FAR macro changed to PTR2FARREG and macro FR_DATA_FAR changed to PTR2FARDATA
+                     in order to support Cosmic compiler for S12X platform.    
+    - UNIFIED_Driver_User_Guide.pdf - CodeWarrior compiler v2.5 for MPC560xP added
+    - UNIFIED_application_examples_user_guide.pdf - CodeWarrior compiler v2.5 for MPC560xP added
+
+
+see "doc/readme_CW25_MPC560xP.txt"
