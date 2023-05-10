@@ -1,0 +1,43 @@
+;Batch Job for debugging in internal FLASH on the MPC5604B demo board
+
+;clear the TRACE32 screen
+WinCLEAR
+
+; reset
+SYStem.RESet
+
+;select CPU type
+SYSTem.CPU MPC55XX
+
+;inform debugger about FLASH memory address range
+Map.BOnchip 0x0--0x0007FFFF
+
+;set debug clock (frequency for debugger-target communication)
+SYSTem.BdmClock 10000000.
+
+;restart the CPU with debug mode enable
+SYSTem.Up
+
+; dualport access
+;SYStem.OPTION DUALPORT ON
+
+; initialize internam SRAM
+d.s a:0x40000000--0x40007FFF %quad 0
+
+
+
+;load program
+Data.Load.Elf ..\bin\internal_FLASH.elf /GLOBTYPES /NOCODE
+
+;display source
+Data.List
+
+;set breakpoint at main
+Break.SET main
+
+; run until main
+;Go
+
+DO winpos.cmm
+
+ENDDO

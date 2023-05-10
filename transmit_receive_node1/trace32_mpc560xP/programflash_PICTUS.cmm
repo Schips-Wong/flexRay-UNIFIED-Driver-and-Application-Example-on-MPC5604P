@@ -1,0 +1,164 @@
+;
+; Example script for programming internal flash of JPC560x derivatives:
+; -	SPC560B
+; -	MPC5604B
+; -	SPC560P
+; -	MPC5604P
+; -	SPC560S
+; -	MPC5606S
+;
+; Internal Program Flash Memory Bank 0 with 512 kByte:
+;   Low address range   256 kByte (32, 16, 16, 32, 32, 128 kByte)
+;                       0x00000000--0x0003ffff
+;   Mid address range   256 kByte (2 * 128 kByte)
+;                       0x00040000--0x0007ffff
+;   Shadow row          32 kByte
+;                       0x00200000--0x00203fff
+; 
+; Internal Program Flash Memory Bank 1 with 512 kByte:
+;   Low address range   256 kByte (32, 16, 16, 32, 32, 128 kByte)
+;                       0x00080000--0x000bffff
+;   Mid address range   256 kByte (2 * 128 kByte)
+;                       0x000c0000--0x000fffff
+; 
+; Internal Data Flash Memory with 64 kByte:
+;   Low address range   256 kByte (4 * 16 kByte)
+;                       0x00800000--0x0080ffff
+; 
+; Internal SRAM         40 kByte
+;                       0x40000000--0x40009fff 
+;
+; Flash register base address is:
+;   Flash Bank 0:       0xc3f88000
+;   Flash Bank 1:       0xc3fb0000
+;   Data Bank:          0xc3f8c000
+;
+; NOTES:
+; 
+;   Flash register base address has to be 0xc3f88000, because target
+;   program does currently not support another base address.
+;
+; wrd - 16.05.2008
+;
+; Internal Program Flash Memory Bank 1 is not supported by the
+; current FLASH library version EAR002 (29.05.2008)
+
+&flashbase=0x00000000
+&shadowbase=0x00200000
+&rambase=0x40000000
+&flashsize=0x000000000
+
+; Optimize flash programming time by switching on PLL
+&optimize=0
+
+;========================================================================
+; CPU setup
+
+SYStem.RESet
+SYStem.BdmClock 4.0MHz
+;select automatic CPU detection
+SYStem.CPU MPC55XX
+SYStem.Option.WATCHDOG OFF
+SYStem.Up
+
+;protect from accessing unimplemented memory (open Data.List/Dump windows)
+MAP.DENYACCESS 0x20000000--0x3FFFFFFF
+
+if &optimize==1
+(
+  ; setup PLL
+  ; tbd
+  ; Data.Set ASD:0xC3F80000 %LONG 0x06000000
+  ; set JTAG clock to 25 MHz
+  SYStem.BdmClock 25MHz
+)
+
+; initialize internal SRAM
+Data.Set EA:0x40000000--0x40007fff %quad 0
+
+;========================================================================
+; Flash declaration
+
+if (CPU()=="SPC560B"||CPU()=="MPC5604B"||CPU()=="SPC560P"||CPU()=="MPC5604P")
+(
+  &flashsize=0x080000
+)
+else if (CPU()=="SPC560S"||CPU()=="MPC5606S")
+(
+  &flashsize=0x100000
+)
+
+FLASH.RESet
+
+; Flash bank 0
+FLASH.Create 1. (&flashbase+0x00000000)++0x07fff TARGET Quad 0. ; L0
+FLASH.Create 1. (&flashbase+0x00008000)++0x03fff TARGET Quad 1. ; L1 
+FLASH.Create 1. (&flashbase+0x0000c000)++0x03fff TARGET Quad 2. ; L2 
+FLASH.Create 1. (&flashbase+0x00010000)++0x07fff TARGET Quad 3. ; L3
+FLASH.Create 1. (&flashbase+0x00018000)++0x07fff TARGET Quad 4. ; L4
+FLASH.Create 1. (&flashbase+0x00020000)++0x1ffff TARGET Quad 5. ; L5
+FLASH.Create 2. (&flashbase+0x00040000)++0x1ffff TARGET Quad 0. ; M0
+FLASH.Create 2. (&flashbase+0x00060000)++0x1ffff TARGET Quad 1. ; M1
+if &flashsize>=0x100000
+(
+  ; Flash bank 1
+  FLASH.Create 3. (&flashbase+0x00080000+0x00000000)++0x07fff TARGET Quad 0. ; L0
+  FLASH.Create 3. (&flashbase+0x00080000+0x00008000)++0x03fff TARGET Quad 1. ; L1 
+  FLASH.Create 3. (&flashbase+0x00080000+0x0000c000)++0x03fff TARGET Quad 2. ; L2 
+  FLASH.Create 3. (&flashbase+0x00080000+0x00010000)++0x07fff TARGET Quad 3. ; L3
+  FLASH.Create 3. (&flashbase+0x00080000+0x00018000)++0x07fff TARGET Quad 4. ; L4
+  FLASH.Create 3. (&flashbase+0x00080000+0x00020000)++0x1ffff TARGET Quad 5. ; L5
+  FLASH.Create 4. (&flashbase+0x00080000+0x00040000)++0x1ffff TARGET Quad 0. ; M0
+  FLASH.Create 4. (&flashbase+0x00080000+0x00060000)++0x1ffff TARGET Quad 1. ; M1
+)
+; Shadow row
+FLASH.Create 9. (&shadowbase+0x00000000)++0x3fff NOP Quad
+; Data flash
+FLASH.Create 10. (&flashbase+0x00800000)++0x3fff TARGET Quad 0.
+FLASH.Create 10. (&flashbase+0x00804000)++0x3fff TARGET Quad 1.
+FLASH.Create 10. (&flashbase+0x00808000)++0x3fff TARGET Quad 2.
+FLASH.Create 10. (&flashbase+0x0080c000)++0x3fff TARGET Quad 3.
+
+FLASH.TARGET E:&rambase E:&rambase+0x2000 0x1000 ~~/demo/powerpc/flash/quad/m10st.bin
+
+;========================================================================
+; Flash programming example
+;
+; Flash programming speed is about three times faster when memory class E:
+; is used for data buffer (DUALPORT memory access). For DUALPORT access it
+; is required to setup MemAccess NEXUS for both, NEXUS and JTAG debugger. 
+
+DIALOG.YESNO "Flash programming prepared. Program flash memory now?"
+entry &progflash
+
+if &progflash 
+(
+  ;FLASH.ReProgram ALL
+  ; erase flash memory  
+  ;Data.Set E:0x00--(&flashsize-1) %Long 0xFFFFFFFF
+  ;Data.LOAD * E:0x00--(&flashsize-1)
+  ;FLASH.ReProgram OFF
+
+  FLASH.ReProgram ALL
+  ;load program to FLASH (add parameter /verify if verification is needed)
+  Data.Load.Elf ..\bin\internal_FLASH.elf /Quad /DualPort
+  FLASH.ReProgram OFF
+
+  ;display source
+  Data.List
+)
+
+;set JTAG clock back to default
+SYStem.BdmClock 4MHz
+
+;print "Executing program...."
+;go
+;wait 60.0S
+;break
+
+;print "Saving result...."
+;data.save.binary Fr_TestResult.dat 0x40005000--0x40005FFF
+;quit
+
+
+ENDDO
